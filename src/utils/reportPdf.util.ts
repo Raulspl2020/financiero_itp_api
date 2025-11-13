@@ -27,11 +27,14 @@ export const convertHTMLtoPDF = async (
       '--headless',
       '--disable-gpu',
       '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
     ],
   });
 
   const page = await browser.newPage();
-  await page.setContent(html);
+  await page.setContent(html,{
+    waitUntil: 'domcontentloaded'
+  });
   const pdf = await page.pdf(configPDF);
   await browser.close();
   return pdf;
