@@ -65,6 +65,9 @@ export const generarCodigoBarras = async ({
   reference,
   value,
 }: IBarcodeInput): Promise<IBarcodeOutput> => {
+
+  value = Math.round(value);
+
   const { barcode, barcodeText } = generarCodigoBarrasString({
     limitDate,
     reference,
