@@ -41,6 +41,14 @@ import { InvoiceSysService } from './services/invoiceSys.service';
 export class PopularCashController {
   private readonly logger = new Logger('POPULAR-ENDPOINT');
 
+  private normalizePopularTransactionCode(transactionCode: string): string {
+    const code = `${transactionCode ?? ''}`.trim();
+    const match = code.match(/^(\d{8})(\d{6})(.*)$/);
+    if (!match) return code;
+    const [, yyyymmdd, , rest] = match;
+    return `${yyyymmdd}${rest}`;
+  }
+
   constructor(
     private readonly invoiceService: InvoiceService,
     private readonly invoiceSysService: InvoiceSysService,
@@ -160,11 +168,15 @@ export class PopularCashController {
         };
       }
 
+      const normalizedTransactionCode = this.normalizePopularTransactionCode(
+        payload.codigo_transaccion,
+      );
+
       const payloadRegister: IPaymentRegister = {
         date: payload.fecha_pago,
         invoiceId: Number(payload.referencia_pago),
         status: EStatusInvoice.PAGO_FINALIZADO_OK,
-        transactionCode: payload.codigo_transaccion,
+        transactionCode: normalizedTransactionCode,
         value: payload.valor_pagado,
         bankId: payload.id_banco,
         name_bank: EBankCash.POPULAR,
@@ -215,7 +227,21 @@ export class PopularCashController {
   @HttpCode(200)
   async reversoFactura(@Body() payload: ReversePaymentDto) {
     try {
-      const status = await this.invoiceService.reversePayment(payload);
+      let status = await this.invoiceService.reversePayment(payload);
+
+      const normalizedTransactionCode = this.normalizePopularTransactionCode(
+        payload.codigo_transaccion,
+      );
+
+      if (
+        status === ESeverityCode.WARNING &&
+        normalizedTransactionCode !== payload.codigo_transaccion
+      ) {
+        status = await this.invoiceService.reversePayment({
+          ...payload,
+          codigo_transaccion: normalizedTransactionCode,
+        });
+      }
 
       const response = {
         codigo_estado: status,
