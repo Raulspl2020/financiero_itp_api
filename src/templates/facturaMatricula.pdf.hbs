@@ -14,7 +14,7 @@
         }
 
         .color-title {
-            color: #002775;
+            color: #003b6f;
         }
 
         .bold {
@@ -22,11 +22,11 @@
         }
 
         hr {
-            color: #000000;
+            color: #003b6f;
             height: 0px;
             margin-top: 25px;
             margin-bottom: 15px;
-            border: 1px dashed;
+            border: 1px dashed #6faed2;
         }
 
         body {
@@ -34,9 +34,19 @@
             margin-left: 1cm;
             margin-right: 1cm;
             margin-bottom: .5cm;
-            font-family: 'Helvetica';
+            font-family: 'Helvetica', 'Arial', sans-serif;
             font-size: 10px;
+            color: #062b49;
             background: url("{{BASE_URL}}/static/img/.svg") no-repeat fixed center;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        body>div:first-child {
+            border-radius: 6px;
+            background: #ffffff;
+            outline: 1px solid rgba(0, 119, 182, .12);
+            box-shadow: inset 0 4px 0 #0077b6, 0 1px 7px rgba(0, 59, 111, .12);
         }
 
         .w-100 {
@@ -48,21 +58,44 @@
         }
 
         .table-border td {
-            padding: 2px;
+            padding: 3px 4px;
             margin: 0px;
-            border: 1px dotted #01579b;
+            border: 1px solid #b9d9eb;
             border-collapse: collapse;
             border-spacing: 0px;
+            line-height: 1.22;
 
         }
 
         .table-border th {
-            border: 1px solid #000000;
-            background: #00b0ff;
-            padding: 2px;
-            border: 1px dotted #01579b;
+            color: #00253f;
+            background: linear-gradient(90deg, #00b0ff 0%, #28c2ff 100%);
+            padding: 3px 4px;
+            border: 1px solid #0784bd;
             border-collapse: collapse;
             border-spacing: 0px;
+            font-size: 8.5px;
+            font-weight: 700;
+            letter-spacing: .25px;
+            text-transform: uppercase;
+        }
+
+        .table-border {
+            border: 1px solid #0b8fc8;
+            border-radius: 5px;
+            overflow: hidden;
+            box-shadow: 0 1px 4px rgba(0, 75, 128, .16);
+        }
+
+        .table-border>tbody>tr:nth-child(1) td,
+        .table-border>tbody>tr:nth-child(2) td,
+        .table-border>tbody>tr:nth-child(3) td,
+        .table-border>tbody>tr:nth-child(4) td {
+            background: #f7fbff;
+        }
+
+        .table-border td table tr:nth-child(even) td {
+            background: #f8fcff;
         }
 
         .sin_borde {
@@ -75,6 +108,84 @@
 
         .text-center {
             text-align: center;
+        }
+
+        .cash-payment-box {
+            box-sizing: border-box;
+            width: 100%;
+            min-height: 46px;
+            padding: 6px 8px;
+            border: 1px solid #a9cfe6;
+            border-left: 4px solid #0077b6;
+            border-radius: 6px;
+            background: linear-gradient(90deg, #f7fbff 0%, #ffffff 100%);
+        }
+
+        .cash-payment-title {
+            display: block;
+            margin-bottom: 4px;
+            color: #003b6f;
+            font-size: 9px;
+            font-weight: bold;
+            letter-spacing: .15px;
+        }
+
+        .cash-payment-content {
+            display: table;
+            width: 100%;
+        }
+
+        .cash-payment-logos {
+            display: table-cell;
+            width: 68%;
+            vertical-align: middle;
+            white-space: nowrap;
+        }
+
+        .cash-payment-logo {
+            display: inline-block;
+            width: auto;
+            height: 23px;
+            max-width: 92px;
+            margin-right: 14px;
+            vertical-align: middle;
+        }
+
+        .cash-payment-agreement {
+            display: table-cell;
+            width: 32%;
+            vertical-align: middle;
+            text-align: right;
+        }
+
+        .cash-payment-agreement span {
+            display: inline-block;
+            padding: 4px 9px;
+            border: 1px solid #7fb6d6;
+            border-radius: 12px;
+            background: #eef8ff;
+            color: #003b6f;
+            font-size: 10px;
+            font-weight: bold;
+            letter-spacing: .2px;
+            box-shadow: inset 0 0 0 1px #ffffff;
+        }
+
+        .total-ordinary,
+        .total-extraordinary {
+            padding: 5px 6px !important;
+            color: #001f35;
+            font-weight: 700;
+            border-left: 3px solid #003b6f !important;
+            line-height: 1.25;
+        }
+
+        .total-ordinary {
+            background: linear-gradient(90deg, #c8ffb8 0%, #64dd17 100%) !important;
+        }
+
+        .total-extraordinary {
+            background: linear-gradient(90deg, #ffb3c0 0%, #ff1744 100%) !important;
         }
 
 
@@ -258,22 +369,22 @@
             </tr>
             <tr>
                 <td rowspan="2" colspan="2" style="width: 70%;">
-                    <small style="font-size: 10px; ">Páguese en efectivo en cualquiera de los siguientes medios:
-                    </small><br>
-                    {{!-- <img class="img img-fluid" alt="" style="height: 30px;"
-                        src="{{BASE_URL}}/assets/logos/bancopopular.png" />
-                    <img class="img img-fluid" alt="" style="height: 30px;"
-                        src="{{BASE_URL}}/assets/logos/efecty.png" />
-                    &nbsp;
-                    <img class="img img-fluid" alt="" style="height: 23px; margin: 2px;"
-                        src="{{BASE_URL}}/assets/logos/su-red.png" />
-                    &nbsp; --}}
-                    <img class="img img-fluid" alt="" style="height: 30px;"
-                        src="{{BASE_URL}}/assets/logos/supergiros.png" />
-
-
+                    <div class="cash-payment-box">
+                        <small class="cash-payment-title">Páguese en efectivo en cualquiera de los siguientes medios:</small>
+                        <div class="cash-payment-content">
+                            <div class="cash-payment-logos">
+                                <img class="cash-payment-logo cash-payment-logo-supergiros" alt="SuperGIROS"
+                                    src="{{BASE_URL}}/assets/logos/supergiros.png" />
+                                <img class="cash-payment-logo cash-payment-logo-efecty" alt="Efecty"
+                                    src="{{BASE_URL}}/assets/logos/efecty.jpeg" />
+                            </div>
+                            <div class="cash-payment-agreement">
+                                <span>Convenio 25854</span>
+                            </div>
+                        </div>
+                    </div>
                 </td>
-                <td style="background: #64dd17;"> Pago ordinario :
+                <td class="total-ordinary" style="background: #64dd17;"> Pago ordinario :
                     <Strong style="float: right;">
                         $ {{formatCurrency totalOrdinario}}
                     </Strong>
@@ -282,7 +393,7 @@
             </tr>
 
             <tr>
-                <td style="background: #ff1744;"> Pago extraordinario :
+                <td class="total-extraordinary" style="background: #ff1744;"> Pago extraordinario :
                     <strong style="float: right;">$ {{formatCurrency totalExtraordinario}}
                     </strong>
                 </td>
