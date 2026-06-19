@@ -330,7 +330,9 @@ export class InvoiceService {
   }
 
   async getInfoInvoice(invoiceId: number) {
+    const startedAt = Date.now();
     const invoice = await this.invoiceRepository.findById(invoiceId);
+    console.log(`[perf:financiero_itp_api:invoice.info] invoiceRepository.findById: ${Date.now() - startedAt}ms invoiceId=${invoiceId}`);
     if (!invoice)
       throw new NotFoundError(`No se encontro la factura con id ${invoiceId}`);
     return invoice;

@@ -59,13 +59,22 @@ export class InvoiceController {
 
   @Get('info/:id')
   async getInfoInvoice(@Param('id', ParseIntPipe) invoiceId: number) {
-    const { jsonResponse, ...rest } = await this.invoiceService.getInfoInvoice(
-      invoiceId,
-    );
-    return {
-      jsonResponse: JSON.parse(jsonResponse),
-      ...rest,
-    };
+    const startedAt = Date.now();
+    console.log(`[perf:financiero_itp_api] GET /api/v2/invoice/info/${invoiceId} start params=${JSON.stringify({ invoiceId })}`);
+    try {
+      const { jsonResponse, ...rest } = await this.invoiceService.getInfoInvoice(
+        invoiceId,
+      );
+      const response = {
+        jsonResponse: JSON.parse(jsonResponse),
+        ...rest,
+      };
+      console.log(`[perf:financiero_itp_api] GET /api/v2/invoice/info/${invoiceId} total ${Date.now() - startedAt}ms`);
+      return response;
+    } catch (error) {
+      console.log(`[perf:financiero_itp_api] GET /api/v2/invoice/info/${invoiceId} failed ${Date.now() - startedAt}ms error=${error?.message}`);
+      throw error;
+    }
   }
 
   @Post('generate')
@@ -82,11 +91,13 @@ export class InvoiceController {
   async createInvoice(
     @Body() payload: GenerateInvoiceDto,
   ): Promise<IInvoiceResponse> {
+    const startedAt = Date.now();
+    console.log(`[perf:financiero_itp_api] POST /api/v2/invoice/create start params=${JSON.stringify({ matriculaId: payload?.matriculaId, personaId: payload?.personaId, codPaquete: payload?.codPaquete, isPagoOnline: payload?.isPagoOnline })}`);
     try {
       const { isOnline, id } =
         await this.generateInvoiceService.generateAndSaveInvoice(payload);
 
-      return {
+      const response = {
         redirectPayment: isOnlinePay(isOnline)
           ? null
           : `${getBaseUrl()}/invoice/pdf/${id}`,
@@ -94,8 +105,11 @@ export class InvoiceController {
         message: 'Ejecucion correcta',
         invoiceId: id,
       };
+      console.log(`[perf:financiero_itp_api] POST /api/v2/invoice/create total ${Date.now() - startedAt}ms invoiceId=${id}`);
+      return response;
     } catch (error) {
       console.log(error);
+      console.log(`[perf:financiero_itp_api] POST /api/v2/invoice/create failed ${Date.now() - startedAt}ms error=${error?.message}`);
       return {
         redirectPayment: null,
         error: true,
@@ -108,14 +122,31 @@ export class InvoiceController {
   @Header('Content-Type', 'application/pdf')
   @Header('Content-Disposition', 'inline; filename=file.pdf')
   async generateInvoicePdf(@Param('id', ParseIntPipe) invoiceId: number) {
-    const buffer = await this.generateInvoiceService.getPdfInvoice(invoiceId);
-    return new StreamableFile(buffer);
+    const startedAt = Date.now();
+    console.log(`[perf:financiero_itp_api] GET /api/v2/invoice/pdf/${invoiceId} start params=${JSON.stringify({ invoiceId })}`);
+    try {
+      const buffer = await this.generateInvoiceService.getPdfInvoice(invoiceId);
+      console.log(`[perf:financiero_itp_api] GET /api/v2/invoice/pdf/${invoiceId} total ${Date.now() - startedAt}ms bytes=${buffer?.length || 0}`);
+      return new StreamableFile(buffer);
+    } catch (error) {
+      console.log(`[perf:financiero_itp_api] GET /api/v2/invoice/pdf/${invoiceId} failed ${Date.now() - startedAt}ms error=${error?.message}`);
+      throw error;
+    }
   }
 
   @Get('html/:id')
   @Header('content-type', 'text/html')
   async generateInvoiceHtml(@Param('id', ParseIntPipe) invoiceId: number) {
-    return this.generateInvoiceService.getHtmlInvoice(invoiceId);
+    const startedAt = Date.now();
+    console.log(`[perf:financiero_itp_api] GET /api/v2/invoice/html/${invoiceId} start params=${JSON.stringify({ invoiceId })}`);
+    try {
+      const html = await this.generateInvoiceService.getHtmlInvoice(invoiceId);
+      console.log(`[perf:financiero_itp_api] GET /api/v2/invoice/html/${invoiceId} total ${Date.now() - startedAt}ms chars=${html?.length || 0}`);
+      return html;
+    } catch (error) {
+      console.log(`[perf:financiero_itp_api] GET /api/v2/invoice/html/${invoiceId} failed ${Date.now() - startedAt}ms error=${error?.message}`);
+      throw error;
+    }
   }
 
   @Get('studenttype')

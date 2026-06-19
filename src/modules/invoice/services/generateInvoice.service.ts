@@ -39,6 +39,19 @@ import { PackageRepository } from '../repositories/package.repository';
 import { ConsultInvoiceService } from './consultInvoice.service';
 import { EnrollmentService } from './enrollment.service';
 
+const profileBlock = async <T>(
+  scope: string,
+  label: string,
+  task: () => Promise<T>,
+): Promise<T> => {
+  const startedAt = Date.now();
+  try {
+    return await task();
+  } finally {
+    console.log(`[perf:financiero_itp_api:${scope}] ${label}: ${Date.now() - startedAt}ms`);
+  }
+};
+
 @Injectable()
 export class GenerateInvoiceService {
   constructor(
@@ -70,24 +83,31 @@ export class GenerateInvoiceService {
       descripcion,
     } = payload;
 
-    const packageInvoce = await this.packageRepository.findConceptsByCode(
-      codPaquete,
+    const packageInvoce = await profileBlock(
+      'invoice.create',
+      'packageRepository.findConceptsByCode',
+      () => this.packageRepository.findConceptsByCode(codPaquete),
     );
     if (!packageInvoce) throw new NotFoundError('No se encontro el paquete');
 
     const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
+    await profileBlock('invoice.create', 'queryRunner.connect', () => queryRunner.connect());
 
-    const [infoMatricula] = !matriculaId
-      ? await queryRunner.manager.query<IEnrollment[]>(INFO_PROGRAMA_SQL, [
-          personaId,
-          programaPersonaId,
-        ])
-      : await queryRunner.manager.query<IEnrollment[]>(INFO_MATRICULA_SQL, [
-          matriculaId,
-        ]);
+    const [infoMatricula] = await profileBlock(
+      'invoice.create',
+      !matriculaId ? 'INFO_PROGRAMA_SQL' : 'INFO_MATRICULA_SQL',
+      () =>
+        !matriculaId
+          ? queryRunner.manager.query<IEnrollment[]>(INFO_PROGRAMA_SQL, [
+              personaId,
+              programaPersonaId,
+            ])
+          : queryRunner.manager.query<IEnrollment[]>(INFO_MATRICULA_SQL, [
+              matriculaId,
+            ]),
+    );
 
-    await queryRunner.release();
+    await profileBlock('invoice.create', 'queryRunner.release', () => queryRunner.release());
 
     if (!infoMatricula)
       throw new NotFoundError('No se encontro el programa o la matricula');
@@ -103,25 +123,36 @@ export class GenerateInvoiceService {
       descripcion,
     };
 
-    const invoice = this.consultInvoiceService.generateInvoiceByParams(params);
+    const invoice = await profileBlock('invoice.create', 'generateInvoiceByParams', async () =>
+      this.consultInvoiceService.generateInvoiceByParams(params),
+    );
     return invoice;
   }
 
   async generateAndSaveInvoice(payload: GenerateInvoiceDto) {
-    const invoiceNew = await this.mainGenerateInvoice(payload);
+    const invoiceNew = await profileBlock('invoice.create', 'mainGenerateInvoice', () =>
+      this.mainGenerateInvoice(payload),
+    );
 
     if (!invoiceNew)
       throw new UnprocessableEntity('No se pudo generar la factura');
 
-    const duplicateInvoice = await this.invoiceRepository.findDuplicateInvoice(
-      payload.personaId,
-      invoiceNew.categoriaPagoId,
+    const duplicateInvoice = await profileBlock(
+      'invoice.create',
+      'invoiceRepository.findDuplicateInvoice',
+      () =>
+        this.invoiceRepository.findDuplicateInvoice(
+          payload.personaId,
+          invoiceNew.categoriaPagoId,
+        ),
     );
 
     if (duplicateInvoice) {
-      await this.detailInvoiceRepository.delete({
-        facturaId: duplicateInvoice.id,
-      });
+      await profileBlock('invoice.create', 'detailInvoiceRepository.deleteDuplicateDetails', () =>
+        this.detailInvoiceRepository.delete({
+          facturaId: duplicateInvoice.id,
+        }),
+      );
     }
     const invoiceSave = this.invoiceRepository.create({
       ...duplicateInvoice,
@@ -129,7 +160,9 @@ export class GenerateInvoiceService {
       descripcion: this.resolveInvoiceDescription(payload.descripcion, invoiceNew),
     });
 
-    return this.invoiceRepository.save(invoiceSave);
+    return profileBlock('invoice.create', 'invoiceRepository.save', () =>
+      this.invoiceRepository.save(invoiceSave),
+    );
   }
 
   private resolveInvoiceDescription(
@@ -157,7 +190,9 @@ export class GenerateInvoiceService {
   }
 
   async getHtmlInvoice(invoiceId: number): Promise<string> {
-    const invoice = await this.invoiceRepository.findById(invoiceId);
+    const invoice = await profileBlock('invoice.html', 'invoiceRepository.findById', () =>
+      this.invoiceRepository.findById(invoiceId),
+    );
 
     if (!invoice)
       throw new NotFoundError(`No se encontro la factura con id ${invoiceId}`);
@@ -165,8 +200,10 @@ export class GenerateInvoiceService {
 
     const { info_cliente }: IInfoInvoice = JSON.parse(jsonResponse);
 
-    const packageInvoce = await this.packageRepository.findConceptsByCode(
-      invoice.codPaquete,
+    const packageInvoce = await profileBlock(
+      'invoice.html',
+      'packageRepository.findConceptsByCode',
+      () => this.packageRepository.findConceptsByCode(invoice.codPaquete),
     );
     if (!packageInvoce) throw new NotFoundError('No se encontro el paquete');
 
@@ -177,19 +214,23 @@ export class GenerateInvoiceService {
     );
 
     const [discounts, studentType] = await Promise.all([
-      this.discountRepository.findForEnrollment(
-        categoryInvoice.id,
-        info_cliente.ide_persona,
-        info_cliente.cod_periodo,
+      profileBlock('invoice.html', 'discountRepository.findForEnrollment', () =>
+        this.discountRepository.findForEnrollment(
+          categoryInvoice.id,
+          info_cliente.ide_persona,
+          info_cliente.cod_periodo,
+        ),
       ),
 
-      this.enrollmentService.generateStudentTypeByEnrollment(info_cliente),
+      profileBlock('invoice.html', 'enrollmentService.generateStudentTypeByEnrollment', () =>
+        this.enrollmentService.generateStudentTypeByEnrollment(info_cliente),
+      ),
     ]);
 
     invoice.detailInvoices = llenarSubTotal(detailInvoices);
 
     const url = `${getBaseUrl()}/invoice/generate/pdf/${invoice.id}`;
-    const qrBase64 = await createQRBase64(url);
+    const qrBase64 = await profileBlock('invoice.html', 'createQRBase64', () => createQRBase64(url));
 
     initializeHelpersHbs();
     const hasPayment = hasPaymentInvoice(invoice);
@@ -197,16 +238,20 @@ export class GenerateInvoiceService {
     if (invoice.categoriaPagoId == ECategoryInvoice.MATRICULA) {
       invoice.detailInvoices = llenarSubTotalSinAumento(detailInvoices);
 
-      const barcodeOrd = await generarCodigoBarras({
-        limitDate: studentType?.fechaFinMatricula,
-        reference: invoice.id.toString(),
-        value: totalOrdinario,
-      });
-      const barcodeExtra = await generarCodigoBarras({
-        limitDate: studentType.fechaFinMatriculaExt,
-        reference: invoice.id.toString(),
-        value: totalExtraordinario,
-      });
+      const barcodeOrd = await profileBlock('invoice.html', 'generarCodigoBarras.ordinario', () =>
+        generarCodigoBarras({
+          limitDate: studentType?.fechaFinMatricula,
+          reference: invoice.id.toString(),
+          value: totalOrdinario,
+        }),
+      );
+      const barcodeExtra = await profileBlock('invoice.html', 'generarCodigoBarras.extraordinario', () =>
+        generarCodigoBarras({
+          limitDate: studentType.fechaFinMatriculaExt,
+          reference: invoice.id.toString(),
+          value: totalExtraordinario,
+        }),
+      );
 
       const dataReport: IInvicePdfParams = {
         ...invoice,
@@ -227,15 +272,19 @@ export class GenerateInvoiceService {
         '../../../',
         'templates/facturaMatricula.pdf.hbs',
       );
-      return compileHBS(pathTemplateBody, dataReport);
+      return profileBlock('invoice.html', 'compileHBS.facturaMatricula', async () =>
+        compileHBS(pathTemplateBody, dataReport),
+      );
     }
 
     if (invoice.categoriaPagoId == ECategoryInvoice.INSCRIPCION) {
-      const barcodeOrd = await generarCodigoBarras({
-        limitDate: studentType.fecFinInsNuevos ?? generateEndDatePayment(),
-        reference: invoice.id.toString(),
-        value: totalOrdinario,
-      });
+      const barcodeOrd = await profileBlock('invoice.html', 'generarCodigoBarras.inscripcion', () =>
+        generarCodigoBarras({
+          limitDate: studentType.fecFinInsNuevos ?? generateEndDatePayment(),
+          reference: invoice.id.toString(),
+          value: totalOrdinario,
+        }),
+      );
 
       const dataReport: IInvicePdfParams = {
         ...invoice,
@@ -254,16 +303,20 @@ export class GenerateInvoiceService {
         '../../../',
         'templates/facturaInscripcion.pdf.hbs',
       );
-      return compileHBS(pathTemplateBody, dataReport);
+      return profileBlock('invoice.html', 'compileHBS.facturaInscripcion', async () =>
+        compileHBS(pathTemplateBody, dataReport),
+      );
     }
 
     const limitDate = invoice.fechaLimite ?? generateEndDatePayment();
 
-    const barcodeOrd = await generarCodigoBarras({
-      limitDate,
-      reference: invoice.id.toString(),
-      value: totalOrdinario,
-    });
+    const barcodeOrd = await profileBlock('invoice.html', 'generarCodigoBarras.general', () =>
+      generarCodigoBarras({
+        limitDate,
+        reference: invoice.id.toString(),
+        value: totalOrdinario,
+      }),
+    );
 
     const dataReport: IInvicePdfParams = {
       ...invoice,
@@ -281,12 +334,18 @@ export class GenerateInvoiceService {
       '../../../',
       'templates/facturaGeneral.pdf.hbs',
     );
-    return compileHBS(pathTemplateBody, dataReport);
+    return profileBlock('invoice.html', 'compileHBS.facturaGeneral', async () =>
+      compileHBS(pathTemplateBody, dataReport),
+    );
   }
 
   async getPdfInvoice(invoiceId: number): Promise<Buffer> {
-    const templateHtml = await this.getHtmlInvoice(invoiceId);
-    const buffer = await convertHTMLtoPDF(templateHtml);
+    const templateHtml = await profileBlock('invoice.pdf', 'getHtmlInvoice', () =>
+      this.getHtmlInvoice(invoiceId),
+    );
+    const buffer = await profileBlock('invoice.pdf', 'convertHTMLtoPDF', () =>
+      convertHTMLtoPDF(templateHtml),
+    );
     return buffer;
   }
 }

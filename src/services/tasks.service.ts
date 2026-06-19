@@ -28,18 +28,31 @@ export class TasksService {
 
   @Cron(CronExpression.EVERY_10_MINUTES)
   async sendPendingPaymentsToEmail() {
+    const startedAt = Date.now();
     this.logger.warn(`start cron job sendPendingPaymentsToEmail`);
+    const queryStartedAt = Date.now();
     const payments = await this.detailPaymentRepository.findPaymentsOkByDate();
+    this.logger.warn(
+      `[perf:financiero_itp_api:cron.sendPendingPaymentsToEmail] findPaymentsOkByDate: ${Date.now() - queryStartedAt}ms rows=${payments.length}`,
+    );
 
     for (const { invoice } of payments) {
       try {
+        const emailStartedAt = Date.now();
         const responseEmail = await this.invoiceService.sendPaymentEmail(
           invoice.id,
+        );
+        this.logger.warn(
+          `[perf:financiero_itp_api:cron.sendPendingPaymentsToEmail] sendPaymentEmail invoiceId=${invoice.id}: ${Date.now() - emailStartedAt}ms`,
         );
       } catch (error) {
         this.logger.warn(error);
       }
     }
+
+    this.logger.warn(
+      `[perf:financiero_itp_api:cron.sendPendingPaymentsToEmail] total ${Date.now() - startedAt}ms rows=${payments.length}`,
+    );
   }
 
   async registerJobInvoicesSysApolo() {
