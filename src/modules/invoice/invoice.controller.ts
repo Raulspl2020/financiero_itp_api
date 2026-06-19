@@ -151,7 +151,13 @@ export class InvoiceController {
 
   @Get('studenttype')
   async getStudentType(@Query('matriculaId') matriculaId: number) {
-    return this.enrollmentService.getDatesStudentType(matriculaId);
+    const startedAt = Date.now();
+    console.log(`[perf] GET /api/v2/invoice/studenttype inicio`);
+    try {
+      return await this.enrollmentService.getDatesStudentType(matriculaId);
+    } finally {
+      console.log(`[perf] GET /api/v2/invoice/studenttype fin ${Date.now() - startedAt}ms`);
+    }
   }
 
   @Get('sysapolo/send-bulk')

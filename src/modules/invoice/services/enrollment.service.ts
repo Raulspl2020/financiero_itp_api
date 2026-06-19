@@ -26,29 +26,50 @@ export class EnrollmentService {
   ) {}
 
   async getDatesStudentType(matriculaId: number): Promise<IStudentType> {
+    const startedAt = Date.now();
+    console.log(`[perf] getDatesStudentType inicio`);
     const queryRunner = this.dataSource.createQueryRunner();
+    const connectStartedAt = Date.now();
     await queryRunner.connect();
-    const [infoMatricula] = await queryRunner.manager.query<IEnrollment[]>(
-      INFO_MATRICULA_SQL,
-      [matriculaId],
-    );
-    if (!queryRunner.isReleased) await queryRunner.release();
+    console.log(`[perf] getDatesStudentType.queryRunner.connect ${Date.now() - connectStartedAt}ms`);
+    let infoMatricula: IEnrollment;
+    try {
+      const queryStartedAt = Date.now();
+      [infoMatricula] = await queryRunner.manager.query<IEnrollment[]>(
+        INFO_MATRICULA_SQL,
+        [matriculaId],
+      );
+      console.log(`[perf] SQL getDatesStudentType.INFO_MATRICULA_SQL ${Date.now() - queryStartedAt}ms`);
+    } finally {
+      const releaseStartedAt = Date.now();
+      if (!queryRunner.isReleased) await queryRunner.release();
+      console.log(`[perf] getDatesStudentType.queryRunner.release ${Date.now() - releaseStartedAt}ms`);
+    }
 
     if (!infoMatricula) throw new NotFoundError('No se encontro la matricula');
 
+    const generateStartedAt = Date.now();
     const responseType = await this.generateStudentTypeByEnrollment(
       infoMatricula,
     );
+    console.log(`[perf] generateStudentTypeByEnrollment ${Date.now() - generateStartedAt}ms`);
+    console.log(`[perf] getDatesStudentType fin ${Date.now() - startedAt}ms`);
+    console.log(`[perf] TOTAL REQUEST ${Date.now() - startedAt}ms`);
     return responseType;
   }
 
   async generateStudentTypeByEnrollment(
     infoMatricula: IEnrollment,
   ): Promise<IStudentType> {
+    const startedAt = Date.now();
+    console.log(`[perf] generateStudentTypeByEnrollment inicio`);
     const queryRunner = this.dataSource.createQueryRunner();
+    const connectStartedAt = Date.now();
     await queryRunner.connect();
+    console.log(`[perf] generateStudentTypeByEnrollment.queryRunner.connect ${Date.now() - connectStartedAt}ms`);
 
     try {
+      const sqlStartedAt = Date.now();
       const [
         pensumMatricula,
         asignaturasRegistradas,
@@ -74,8 +95,12 @@ export class EnrollmentService {
           },
         }),
       ]);
+      console.log(`[perf] SQL generateStudentTypeByEnrollment.parallelQueries ${Date.now() - sqlStartedAt}ms`);
+      const releaseStartedAt = Date.now();
       await queryRunner.release();
+      console.log(`[perf] generateStudentTypeByEnrollment.queryRunner.release ${Date.now() - releaseStartedAt}ms`);
 
+      const transformStartedAt = Date.now();
       const fecIniMatordinaria =
         asignaturasRegistradas[0]?.mat_ordinaria == 'Y'
           ? asignaturasRegistradas[0]?.fechaini_matord
@@ -102,6 +127,8 @@ export class EnrollmentService {
       );
 
       if (!isEmpty(pensumMatricula) && isEmpty(asignaturasRegistradas)) {
+        console.log(`[perf] transformStudentType ${Date.now() - transformStartedAt}ms`);
+        console.log(`[perf] generateStudentTypeByEnrollment fin ${Date.now() - startedAt}ms`);
         return {
           codigo: 1,
           descripcion: 'ESTUDIANTE_NUEVO',
@@ -119,6 +146,8 @@ export class EnrollmentService {
       );
 
       if (newStudent && Number(cantidadMatricula?.numero) == 1) {
+        console.log(`[perf] transformStudentType ${Date.now() - transformStartedAt}ms`);
+        console.log(`[perf] generateStudentTypeByEnrollment fin ${Date.now() - startedAt}ms`);
         return {
           codigo: 1,
           descripcion: 'ESTUDIANTE_NUEVO',
@@ -139,6 +168,8 @@ export class EnrollmentService {
 
       if (!matriculaUnica) {
         if (noNivelado) {
+          console.log(`[perf] transformStudentType ${Date.now() - transformStartedAt}ms`);
+          console.log(`[perf] generateStudentTypeByEnrollment fin ${Date.now() - startedAt}ms`);
           return {
             codigo: 3,
             descripcion: 'ESTUDIANTE_ANTIGUO_NO_NIVELADO',
@@ -165,6 +196,8 @@ export class EnrollmentService {
           ).length;
 
           if (numeroAsigPensul != numeroAsigRegistradas) {
+            console.log(`[perf] transformStudentType ${Date.now() - transformStartedAt}ms`);
+            console.log(`[perf] generateStudentTypeByEnrollment fin ${Date.now() - startedAt}ms`);
             return {
               codigo: 3,
               descripcion: 'ESTUDIANTE_ANTIGUO_NO_NIVELADO',
@@ -180,6 +213,8 @@ export class EnrollmentService {
       }
 
       if (asigPerdidas) {
+        console.log(`[perf] transformStudentType ${Date.now() - transformStartedAt}ms`);
+        console.log(`[perf] generateStudentTypeByEnrollment fin ${Date.now() - startedAt}ms`);
         return {
           codigo: 3,
           descripcion: 'ESTUDIANTE_ANTIGUO_NO_NIVELADO',
@@ -192,6 +227,8 @@ export class EnrollmentService {
         };
       }
 
+      console.log(`[perf] transformStudentType ${Date.now() - transformStartedAt}ms`);
+      console.log(`[perf] generateStudentTypeByEnrollment fin ${Date.now() - startedAt}ms`);
       return {
         codigo: 2,
         descripcion: 'ESTUDIANTE_ANTIGUO_NIVELADO',
@@ -206,6 +243,7 @@ export class EnrollmentService {
       if (!queryRunner.isReleased) {
         await queryRunner.release();
       }
+      console.log(`[perf] generateStudentTypeByEnrollment fin ${Date.now() - startedAt}ms`);
       throw new Error('Error al generar las fechas de matricula');
     }
   }

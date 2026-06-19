@@ -48,7 +48,9 @@ const profileBlock = async <T>(
   try {
     return await task();
   } finally {
-    console.log(`[perf:financiero_itp_api:${scope}] ${label}: ${Date.now() - startedAt}ms`);
+    const ms = Date.now() - startedAt;
+    console.log(`[perf:financiero_itp_api:${scope}] ${label}: ${ms}ms`);
+    console.log(`[perf] ${scope}.${label} ${ms}ms`);
   }
 };
 

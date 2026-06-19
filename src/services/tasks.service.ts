@@ -29,11 +29,15 @@ export class TasksService {
   @Cron(CronExpression.EVERY_10_MINUTES)
   async sendPendingPaymentsToEmail() {
     const startedAt = Date.now();
+    this.logger.warn(`[perf] cron sendPendingPaymentsToEmail inicio`);
     this.logger.warn(`start cron job sendPendingPaymentsToEmail`);
     const queryStartedAt = Date.now();
     const payments = await this.detailPaymentRepository.findPaymentsOkByDate();
     this.logger.warn(
       `[perf:financiero_itp_api:cron.sendPendingPaymentsToEmail] findPaymentsOkByDate: ${Date.now() - queryStartedAt}ms rows=${payments.length}`,
+    );
+    this.logger.warn(
+      `[perf] SQL findPaymentsOkByDate ${Date.now() - queryStartedAt}ms`,
     );
 
     for (const { invoice } of payments) {
@@ -45,6 +49,9 @@ export class TasksService {
         this.logger.warn(
           `[perf:financiero_itp_api:cron.sendPendingPaymentsToEmail] sendPaymentEmail invoiceId=${invoice.id}: ${Date.now() - emailStartedAt}ms`,
         );
+        this.logger.warn(
+          `[perf] sendPaymentEmail ${Date.now() - emailStartedAt}ms`,
+        );
       } catch (error) {
         this.logger.warn(error);
       }
@@ -52,6 +59,9 @@ export class TasksService {
 
     this.logger.warn(
       `[perf:financiero_itp_api:cron.sendPendingPaymentsToEmail] total ${Date.now() - startedAt}ms rows=${payments.length}`,
+    );
+    this.logger.warn(
+      `[perf] cron sendPendingPaymentsToEmail fin ${Date.now() - startedAt}ms`,
     );
   }
 
