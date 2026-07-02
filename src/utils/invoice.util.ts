@@ -15,6 +15,8 @@ const normalizeRate = (value: number): number => {
   return value;
 };
 
+const TECHNOLOGY_CREDIT_CONCEPT_ID = 33;
+
 export const limpiarCampos = (cadena: string = '') => {
   cadena.toString().replace(/[`~!@#$%^&*¬()_|\-=?;:'",.<>\{\}\[\]\\\/]/gim, '');
 };
@@ -114,9 +116,13 @@ export const calcularTotalExtraOrdinario = (
       const aumentoAplicado = Number(aumento) < 0 ? safeAumento : Number(aumento);
 
       const subtotal = valorUnidad * cantidad;
+      const quantityForIncrease =
+        Number(conceptoId) == TECHNOLOGY_CREDIT_CONCEPT_ID && safeDescuento >= 1
+          ? 1
+          : cantidad;
       //primero se aplica el aumento, para calcular el descuento sobre el resultado obtenido
       const subtotalDescuento = subtotal * safeDescuento;
-      const subtotalAumento = subtotal * aumentoAplicado;
+      const subtotalAumento = valorUnidad * quantityForIncrease * aumentoAplicado;
       return subtotal - subtotalDescuento + subtotalAumento;
     })
     .reduce((a, b) => a + b, 0);

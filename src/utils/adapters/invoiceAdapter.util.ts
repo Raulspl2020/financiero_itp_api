@@ -11,6 +11,8 @@ const clampRate = (value: number): number => {
   return value;
 };
 
+const INDIVIDUAL_CREDIT_CONCEPT_IDS = [1, 2, 33];
+
 export const createDetailInvoice = ({
   packageDetail,
   aumentoExtra = 0,
@@ -22,11 +24,12 @@ export const createDetailInvoice = ({
   return packageDetail
     .map<DeepPartial<DetailInvoice>>((detail) => {
       const { aumento, conceptoId, descuento, valorUnidad, cantidad } = detail;
+      let detailQuantity = quantity;
 
       if (categoriaId == ECategoryInvoice.MATRICULA) {
         // solo se usa la cantidad enviada si son conceptos de creditos individuales
-        if (![1, 2].includes(Number(conceptoId))) {
-          quantity = cantidad;
+        if (!INDIVIDUAL_CREDIT_CONCEPT_IDS.includes(Number(conceptoId))) {
+          detailQuantity = cantidad;
         }
       }
 
@@ -35,7 +38,7 @@ export const createDetailInvoice = ({
         valorUnidad: total > 0 ? total : valorUnidad,
         concept: detail.concept,
         aumento: detail.descuentoExt == '1' ? aumentoExtra + aumento : aumento,
-        cantidad: Number(quantity < 1 ? 1 : quantity),
+        cantidad: Number(detailQuantity < 1 ? 1 : detailQuantity),
         descuento: clampRate(
           Number(detail.descuentoExt == '1' ? descuentoExtra + descuento : descuento),
         ),

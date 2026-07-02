@@ -54,6 +54,8 @@ const profileBlock = async <T>(
   }
 };
 
+const TECHNOLOGY_CREDIT_CONCEPT_ID = 33;
+
 @Injectable()
 export class GenerateInvoiceService {
   constructor(
@@ -239,6 +241,21 @@ export class GenerateInvoiceService {
 
     if (invoice.categoriaPagoId == ECategoryInvoice.MATRICULA) {
       invoice.detailInvoices = llenarSubTotalSinAumento(detailInvoices);
+      invoice.detailInvoices = invoice.detailInvoices.map((detail) => {
+        const creditQuantity = Number(info_cliente?.nro_creditos || 0);
+        if (
+          Number(detail.conceptoId) == TECHNOLOGY_CREDIT_CONCEPT_ID &&
+          Number(detail.descuento) >= 1 &&
+          creditQuantity > 0
+        ) {
+          return {
+            ...detail,
+            cantidad: creditQuantity,
+          };
+        }
+
+        return detail;
+      });
 
       const barcodeOrd = await profileBlock('invoice.html', 'generarCodigoBarras.ordinario', () =>
         generarCodigoBarras({
