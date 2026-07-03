@@ -63,6 +63,14 @@ export class GenerateInvoiceDto {
   })
   cantidad?: number;
 
+  @IsNumber()
+  @IsPositive()
+  @IsOptional()
+  @Transform(({ value }) => {
+    return Number(value);
+  })
+  conceptoId?: number;
+
   @IsString()
   @IsOptional()
   @MaxLength(500)

@@ -84,6 +84,7 @@ export class GenerateInvoiceService {
       personaId,
       programaPersonaId,
       cantidad,
+      conceptoId,
       descripcion,
     } = payload;
 
@@ -124,6 +125,7 @@ export class GenerateInvoiceService {
       total,
       categoriaPagoId: packageInvoce.categoriaId,
       cantidad,
+      conceptoId,
       descripcion,
     };
 

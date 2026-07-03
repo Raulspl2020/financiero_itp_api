@@ -12,6 +12,7 @@ export interface IGenerateInvoice {
   isPagoOnline: boolean;
   infoEstudiante: IStudent;
   cantidad?: number;
+  conceptoId?: number;
   descripcion?: string;
 }
 

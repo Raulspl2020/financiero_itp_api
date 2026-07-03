@@ -135,7 +135,17 @@ export class ConsultInvoiceService {
     );
     if (!packageInvoce) throw new NotFoundError('No se encontro el paquete');
 
-    const { packageDetail, categoriaId } = packageInvoce;
+    let { packageDetail } = packageInvoce;
+    const { categoriaId } = packageInvoce;
+
+    if (params.conceptoId) {
+      packageDetail = packageDetail.filter(
+        (detail) => Number(detail.conceptoId) === Number(params.conceptoId),
+      );
+      if (packageDetail.length === 0) {
+        throw new NotFoundError('El concepto seleccionado no pertenece al paquete');
+      }
+    }
 
     const { infoEstudiante: infoMatricula, total } = params;
 
