@@ -148,11 +148,25 @@ export class ConsultInvoiceService {
     }
 
     const { infoEstudiante: infoMatricula, total } = params;
+    const manualTotal = Number(total);
+    const isManualValueConcept =
+      packageDetail.length === 1 &&
+      Number(packageDetail[0].valorUnidad) === 0 &&
+      Number.isFinite(manualTotal) &&
+      manualTotal > 0 &&
+      !!params.conceptoId;
+
+    if (isManualValueConcept) {
+      packageDetail = packageDetail.map((detail) => ({
+        ...detail,
+        valorUnidad: manualTotal,
+        cantidad: 1,
+      }));
+    }
 
     const detailInvoice = this.detailInvoiceRepository.create(
       createDetailInvoice({
         packageDetail,
-        total,
       }),
     );
 
