@@ -13,6 +13,10 @@ import {
 } from '../../../interfaces/payment.interface';
 import { messageEmailPaymentOk } from '../../../utils/messages.util';
 import {
+  deduplicateDiscountsByCategory,
+  filterDiscountsForEnrollment,
+} from '../../../utils/discountEligibility.util';
+import {
   compileHBS,
   convertHTMLtoPDF,
   initializeHelpersHbs,
@@ -82,10 +86,14 @@ export class InvoiceService {
       const { info_cliente: infoMatricula }: IInfoInvoice =
         JSON.parse(jsonResponse);
 
-      const discounts = await this.discountRepository.findForEnrollment(
+      const discountsRaw = await this.discountRepository.findForEnrollment(
         categoriaPagoId,
         infoMatricula?.ide_persona,
         infoMatricula?.cod_periodo,
+        invoice.matriculaId,
+      );
+      const discounts = deduplicateDiscountsByCategory(
+        filterDiscountsForEnrollment(discountsRaw, infoMatricula),
       );
 
       try {
@@ -348,7 +356,13 @@ export class InvoiceService {
       await queryRunner.connect();
       await queryRunner.startTransaction();
 
-      const insertDiscounts = discounts.map<DeepPartial<InvoiceDiscounts>>(
+      const selectedDiscounts = deduplicateDiscountsByCategory(discounts);
+      if (selectedDiscounts.length === 0) {
+        await queryRunner.commitTransaction();
+        return true;
+      }
+
+      const insertDiscounts = selectedDiscounts.map<DeepPartial<InvoiceDiscounts>>(
         (discount) => {
           return {
             facturaId: invoiceId,
@@ -357,7 +371,7 @@ export class InvoiceService {
         },
       );
 
-      for (const dto of discounts) {
+      for (const dto of selectedDiscounts) {
         await queryRunner.manager.update(
           Discounts,
           {

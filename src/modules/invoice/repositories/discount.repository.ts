@@ -15,8 +15,9 @@ export class DiscountRepository extends Repository<Discounts> {
     categoriaId: number,
     estudianteId: string,
     periodoId: number,
+    matriculaId?: number,
   ) {
-    return this.repository
+    const query = this.repository
       .createQueryBuilder('dto')
       .innerJoinAndSelect('dto.discountCategory', 'disc')
       .where('dto.categoriaPagoId = :categoriaId', { categoriaId })
@@ -28,8 +29,15 @@ export class DiscountRepository extends Repository<Discounts> {
       })
       .andWhere('dto.porcentajeEstadoId = :status', {
         status: EDiscountStatus.APROBADO,
-      })
-      .getMany();
+      });
+
+    if (matriculaId !== undefined && matriculaId !== null) {
+      query.andWhere('(dto.matriculaId = :matriculaId OR dto.matriculaId IS NULL)', {
+        matriculaId,
+      });
+    }
+
+    return query.getMany();
   }
 
   findForInvoiceGeneral(categoriaId: number, estudianteId: string) {

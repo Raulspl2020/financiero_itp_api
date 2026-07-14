@@ -12,6 +12,12 @@ import {
 } from '../../../interfaces/enrollment.interface';
 import { createDetailInvoice } from '../../../utils/adapters/invoiceAdapter.util';
 import {
+  deduplicateDiscountsByCategory,
+  filterDiscountsForEnrollment,
+  filterDiscountsForInvoiceMode,
+  resolveEnrollmentPaymentMode,
+} from '../../../utils/discountEligibility.util';
+import {
   calcularTotales,
   generateCodeInvoice,
   generateEndDatePayment,
@@ -234,9 +240,11 @@ export class ConsultInvoiceService {
       }));
     }
 
-    const discounts = await this.discountRepository.findForInvoiceGeneral(
-      categoriaId,
-      infoEstudiante.ide_persona,
+    const discounts = deduplicateDiscountsByCategory(
+      await this.discountRepository.findForInvoiceGeneral(
+        categoriaId,
+        infoEstudiante.ide_persona,
+      ),
     );
     const infoClient: IInfoInvoice = {
       info_cliente: params.infoEstudiante,
@@ -311,7 +319,7 @@ export class ConsultInvoiceService {
 
     const { packageDetail, categoriaId } = packageInvoce;
 
-    const [period, discounts] = await Promise.all([
+    const [period, discountsRaw] = await Promise.all([
       this.periodRepository.findOne({
         where: {
           codPeriodo: infoMatricula.cod_periodo,
@@ -322,8 +330,13 @@ export class ConsultInvoiceService {
         categoriaId,
         infoMatricula.ide_persona,
         infoMatricula.cod_periodo,
+        params.matriculaId,
       ),
     ]);
+
+    const discounts = deduplicateDiscountsByCategory(
+      filterDiscountsForEnrollment(discountsRaw, infoMatricula),
+    );
 
     if (!period) throw new NotFoundError('No se encontro el periodo academico');
 
@@ -382,10 +395,12 @@ export class ConsultInvoiceService {
 
     let quantity = 0;
     let codPaquete = '0';
-    if (
-      infoMatricula.nro_creditos > config.minCreditos ||
-      infoMatricula.nro_creditos == 0
-    ) {
+    const paymentMode = resolveEnrollmentPaymentMode(
+      infoMatricula.nro_creditos,
+      config.minCreditos,
+    );
+
+    if (paymentMode !== 'INDIVIDUAL_CREDIT_PAYMENT') {
       codPaquete = PACKAGE_TYPE.COMPLETO[infoMatricula.cod_nivel_edu];
     } else {
       codPaquete = PACKAGE_TYPE.INDIVIDUAL[infoMatricula.cod_nivel_edu];
@@ -399,14 +414,22 @@ export class ConsultInvoiceService {
 
     const { packageDetail, categoriaId } = packageInvoce;
 
-    const [discounts, studentType] = await Promise.all([
+    const [discountsRaw, studentType] = await Promise.all([
       this.discountRepository.findForEnrollment(
         categoriaId,
         infoMatricula.ide_persona,
         infoMatricula.cod_periodo,
+        params.matriculaId,
       ),
       this.enrollmentService.generateStudentTypeByEnrollment(infoMatricula),
     ]);
+
+    const discounts = filterDiscountsForInvoiceMode(
+      deduplicateDiscountsByCategory(
+        filterDiscountsForEnrollment(discountsRaw, infoMatricula),
+      ),
+      paymentMode,
+    );
 
     const currenDate = new Date();
 

@@ -11,7 +11,7 @@ const clampRate = (value: number): number => {
   return value;
 };
 
-const INDIVIDUAL_CREDIT_CONCEPT_IDS = [1, 2, 33];
+export const INDIVIDUAL_CREDIT_CONCEPT_IDS = [33, 35];
 
 export const createDetailInvoice = ({
   packageDetail,

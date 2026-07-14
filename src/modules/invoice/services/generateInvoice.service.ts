@@ -11,6 +11,10 @@ import {
 } from 'src/interfaces/invoice.interface';
 import { generarCodigoBarras } from 'src/utils/barcode.util';
 import {
+  deduplicateDiscountsByCategory,
+  filterDiscountsForEnrollment,
+} from 'src/utils/discountEligibility.util';
+import {
   calcularTotales,
   calcularTotalExtraOrdinario,
   createQRBase64,
@@ -219,12 +223,13 @@ export class GenerateInvoiceService {
       packageInvoce,
     );
 
-    const [discounts, studentType] = await Promise.all([
+    const [discountsRaw, studentType] = await Promise.all([
       profileBlock('invoice.html', 'discountRepository.findForEnrollment', () =>
         this.discountRepository.findForEnrollment(
           categoryInvoice.id,
           info_cliente.ide_persona,
           info_cliente.cod_periodo,
+          invoice.matriculaId,
         ),
       ),
 
@@ -232,6 +237,9 @@ export class GenerateInvoiceService {
         this.enrollmentService.generateStudentTypeByEnrollment(info_cliente),
       ),
     ]);
+    const discounts = deduplicateDiscountsByCategory(
+      filterDiscountsForEnrollment(discountsRaw, info_cliente),
+    );
 
     invoice.detailInvoices = llenarSubTotal(detailInvoices);
 
