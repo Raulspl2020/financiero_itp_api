@@ -15,6 +15,7 @@ import {
   deduplicateDiscountsByCategory,
   filterDiscountsForEnrollment,
   filterDiscountsForInvoiceMode,
+  isGratuityDiscount,
   resolveEnrollmentPaymentMode,
 } from '../../../utils/discountEligibility.util';
 import {
@@ -41,6 +42,44 @@ import { DiscountRepository } from '../repositories/discount.repository';
 import { InvoiceRepository } from '../repositories/invoice.repository';
 import { PackageRepository } from '../repositories/package.repository';
 import { EnrollmentService } from './enrollment.service';
+
+const traceDiscounts = (label: string, discounts: any[]) => {
+  console.log(
+    `[DISCOUNT-TRACE] ${label}=${JSON.stringify(
+      (discounts || []).map((discount) => ({
+        discountId: discount?.id,
+        categoryId: discount?.porcentajeCategoriaId,
+        description: discount?.discountCategory?.descripcion,
+        status: discount?.porcentajeEstadoId,
+        rate: discount?.porcentaje,
+        isGratuity: isGratuityDiscount(discount),
+      })),
+    )}`,
+  );
+};
+
+const traceDetailDiscount = (detail: DetailInvoice) => {
+  const quantity = Number(detail?.cantidad) || 0;
+  const unitValue = Number(detail?.valorUnidad) || 0;
+  const discountRate = Number(detail?.descuento) || 0;
+  const originalSubtotal = quantity * unitValue;
+  const discountAmount = originalSubtotal * discountRate;
+  console.log(
+    `[DISCOUNT-TRACE] concept=${JSON.stringify({
+      conceptId: detail?.conceptoId,
+      quantity,
+      unitValue,
+      originalSubtotal,
+      discountRate,
+      discountAmount,
+      finalSubtotal: Math.max(originalSubtotal - discountAmount, 0),
+      reason:
+        discountRate > 0
+          ? 'DISCOUNT_APPLIED'
+          : 'CONCEPT_NOT_DISCOUNTABLE_OR_NO_APPROVED_RATE',
+    })}`,
+  );
+};
 
 @Injectable()
 export class ConsultInvoiceService {
@@ -424,12 +463,20 @@ export class ConsultInvoiceService {
       this.enrollmentService.generateStudentTypeByEnrollment(infoMatricula),
     ]);
 
+    console.log(`[DISCOUNT-TRACE] enrollment=${params.matriculaId}`);
+    console.log(`[DISCOUNT-TRACE] credits=${infoMatricula.nro_creditos}`);
+    console.log(`[DISCOUNT-TRACE] invoiceMode=${paymentMode}`);
+    console.log(`[DISCOUNT-TRACE] academicLevelCode=${infoMatricula.cod_nivel_edu}`);
+    traceDiscounts('discountsBeforeFilter', discountsRaw);
+    const discountsForEnrollment = deduplicateDiscountsByCategory(
+      filterDiscountsForEnrollment(discountsRaw, infoMatricula),
+    );
+    traceDiscounts('discountsAfterEnrollmentFilter', discountsForEnrollment);
     const discounts = filterDiscountsForInvoiceMode(
-      deduplicateDiscountsByCategory(
-        filterDiscountsForEnrollment(discountsRaw, infoMatricula),
-      ),
+      discountsForEnrollment,
       paymentMode,
     );
+    traceDiscounts('discountsAfterInvoiceModeFilter', discounts);
 
     const currenDate = new Date();
 
@@ -460,6 +507,7 @@ export class ConsultInvoiceService {
         categoriaId,
       }),
     );
+    detailInvoice.forEach(traceDetailDiscount);
     const infoClient: IInfoInvoice = {
       info_cliente: params.infoEstudiante,
     };

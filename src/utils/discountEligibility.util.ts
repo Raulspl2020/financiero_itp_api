@@ -134,9 +134,6 @@ export const filterDiscountsForInvoiceMode = (
   discounts: any[],
   paymentMode: InvoicePaymentMode,
 ): any[] => {
-  if (paymentMode !== INVOICE_PAYMENT_MODE.INDIVIDUAL_CREDIT_PAYMENT) {
-    return discounts || [];
-  }
-
-  return (discounts || []).filter((discount) => isGratuityDiscount(discount));
+  void paymentMode;
+  return discounts || [];
 };
