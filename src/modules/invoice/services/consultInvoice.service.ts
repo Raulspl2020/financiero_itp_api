@@ -58,6 +58,8 @@ const traceDiscounts = (label: string, discounts: any[]) => {
   );
 };
 
+const SPECIALIZATION_PACKAGE_LEVEL_CODES = new Set([11]);
+
 const traceDetailDiscount = (detail: DetailInvoice) => {
   const quantity = Number(detail?.cantidad) || 0;
   const unitValue = Number(detail?.valorUnidad) || 0;
@@ -433,23 +435,49 @@ export class ConsultInvoiceService {
     if (!config) throw new NotFoundError('No se encontro la configuracion');
 
     let quantity = 0;
-    let codPaquete = '0';
+    let resolvedPackageCode = '0';
     const paymentMode = resolveEnrollmentPaymentMode(
       infoMatricula.nro_creditos,
       config.minCreditos,
     );
 
     if (paymentMode !== 'INDIVIDUAL_CREDIT_PAYMENT') {
-      codPaquete = PACKAGE_TYPE.COMPLETO[infoMatricula.cod_nivel_edu];
+      resolvedPackageCode = PACKAGE_TYPE.COMPLETO[infoMatricula.cod_nivel_edu];
     } else {
-      codPaquete = PACKAGE_TYPE.INDIVIDUAL[infoMatricula.cod_nivel_edu];
+      resolvedPackageCode = PACKAGE_TYPE.INDIVIDUAL[infoMatricula.cod_nivel_edu];
       quantity = infoMatricula.nro_creditos;
     }
 
-    const packageInvoce = await this.packageRepository.findConceptsByCode(
-      codPaquete,
+    const isSpecializationPackage = SPECIALIZATION_PACKAGE_LEVEL_CODES.has(
+      Number(infoMatricula.cod_nivel_edu),
     );
+    let packageInvoce = null;
+
+    if (isSpecializationPackage) {
+      const packagesByProgram = await this.packageRepository.findConceptsByProgramName(
+        infoMatricula.nom_nivel_educativo,
+      );
+
+      if (packagesByProgram.length !== 1) {
+        throw new UnprocessableEntity(
+          'No existe una configuración financiera única para el programa académico de la matrícula. Verifique la parametrización programa-paquete.',
+        );
+      }
+
+      packageInvoce = packagesByProgram[0];
+      resolvedPackageCode = packageInvoce.codigo;
+    } else {
+      packageInvoce = await this.packageRepository.findConceptsByCode(
+        resolvedPackageCode,
+      );
+    }
     if (!packageInvoce) throw new NotFoundError('No se encontro el paquete');
+
+    if (!packageInvoce.packageDetail || packageInvoce.packageDetail.length === 0) {
+      throw new UnprocessableEntity(
+        'No existe una configuración financiera única para el programa académico de la matrícula. Verifique la parametrización programa-paquete.',
+      );
+    }
 
     const { packageDetail, categoriaId } = packageInvoce;
 
@@ -521,7 +549,7 @@ export class ConsultInvoiceService {
       valor: total,
       periodoId: infoMatricula.cod_periodo,
       jsonResponse: JSON.stringify(infoClient),
-      codPaquete,
+      codPaquete: resolvedPackageCode,
       fechaLimite: studentType.fechaFinMatriculaExt,
       isOnline: params.isPagoOnline ? EOnlinePayment.SI : EOnlinePayment.NO,
       categoriaPagoId: categoriaId,
