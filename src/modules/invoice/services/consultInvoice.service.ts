@@ -43,7 +43,14 @@ import { InvoiceRepository } from '../repositories/invoice.repository';
 import { PackageRepository } from '../repositories/package.repository';
 import { EnrollmentService } from './enrollment.service';
 
+// fin_porcetaje_categoria._id: 2 = votacion, 15 = egresado, 16 = COOTEP.
+const SPECIALIZATION_ALLOWED_DISCOUNT_CATEGORY_IDS = new Set([2, 15, 16]);
+// fin_detalle_paquete.concepto_id: 52 = Talento Humano, 64 = Gestion Ambiental.
+const SPECIALIZATION_TUITION_CONCEPT_IDS = [52, 64];
+
 const traceDiscounts = (label: string, discounts: any[]) => {
+  if (process.env.DISCOUNT_TRACE !== 'true') return;
+
   console.log(
     `[DISCOUNT-TRACE] ${label}=${JSON.stringify(
       (discounts || []).map((discount) => ({
@@ -58,9 +65,12 @@ const traceDiscounts = (label: string, discounts: any[]) => {
   );
 };
 
+// col_nivel_educacion.cod_nivel_edu: 11 = programas de especializacion.
 const SPECIALIZATION_PACKAGE_LEVEL_CODES = new Set([11]);
 
 const traceDetailDiscount = (detail: DetailInvoice) => {
+  if (process.env.DISCOUNT_TRACE !== 'true') return;
+
   const quantity = Number(detail?.cantidad) || 0;
   const unitValue = Number(detail?.valorUnidad) || 0;
   const discountRate = Number(detail?.descuento) || 0;
@@ -80,6 +90,65 @@ const traceDetailDiscount = (detail: DetailInvoice) => {
           ? 'DISCOUNT_APPLIED'
           : 'CONCEPT_NOT_DISCOUNTABLE_OR_NO_APPROVED_RATE',
     })}`,
+  );
+};
+
+const isAllowedSpecializationDiscount = (discount: any): boolean => {
+  return (
+    Number(discount?.porcentajeEstadoId) === 2 &&
+    Number(discount?.accion) === 1 &&
+    SPECIALIZATION_ALLOWED_DISCOUNT_CATEGORY_IDS.has(
+      Number(discount?.porcentajeCategoriaId),
+    ) &&
+    !isGratuityDiscount(discount)
+  );
+};
+
+const hasRequiredSameFiniteNumber = (
+  currentValue: any,
+  discountValue: any,
+): boolean => {
+  const current = Number(currentValue);
+  const discount = Number(discountValue);
+
+  return (
+    Number.isFinite(current) &&
+    current > 0 &&
+    Number.isFinite(discount) &&
+    discount > 0 &&
+    current === discount
+  );
+};
+
+const isSpecializationDiscountForCurrentEnrollment = (
+  discount: any,
+  enrollment: any,
+): boolean => {
+  return (
+    hasRequiredSameFiniteNumber(
+      enrollment?.cod_matricula,
+      discount?.matriculaId,
+    ) &&
+    hasRequiredSameFiniteNumber(enrollment?.cod_periodo, discount?.periodoId) &&
+    hasRequiredSameFiniteNumber(
+      enrollment?.ide_persona,
+      discount?.estudianteId,
+    ) &&
+    hasRequiredSameFiniteNumber(1, discount?.categoriaPagoId)
+  );
+};
+
+const filterDiscountsForPackage = (
+  enrollment: any,
+  discounts: any[],
+  isSpecializationPackage: boolean,
+): any[] => {
+  if (!isSpecializationPackage) return discounts || [];
+
+  return (discounts || []).filter(
+    (discount) =>
+      isAllowedSpecializationDiscount(discount) &&
+      isSpecializationDiscountForCurrentEnrollment(discount, enrollment),
   );
 };
 
@@ -491,18 +560,21 @@ export class ConsultInvoiceService {
       this.enrollmentService.generateStudentTypeByEnrollment(infoMatricula),
     ]);
 
-    console.log(`[DISCOUNT-TRACE] enrollment=${params.matriculaId}`);
-    console.log(`[DISCOUNT-TRACE] credits=${infoMatricula.nro_creditos}`);
-    console.log(`[DISCOUNT-TRACE] invoiceMode=${paymentMode}`);
-    console.log(`[DISCOUNT-TRACE] academicLevelCode=${infoMatricula.cod_nivel_edu}`);
+    if (process.env.DISCOUNT_TRACE === 'true') {
+      console.log(`[DISCOUNT-TRACE] enrollment=${params.matriculaId}`);
+      console.log(`[DISCOUNT-TRACE] credits=${infoMatricula.nro_creditos}`);
+      console.log(`[DISCOUNT-TRACE] invoiceMode=${paymentMode}`);
+      console.log(`[DISCOUNT-TRACE] academicLevelCode=${infoMatricula.cod_nivel_edu}`);
+    }
     traceDiscounts('discountsBeforeFilter', discountsRaw);
     const discountsForEnrollment = deduplicateDiscountsByCategory(
       filterDiscountsForEnrollment(discountsRaw, infoMatricula),
     );
     traceDiscounts('discountsAfterEnrollmentFilter', discountsForEnrollment);
-    const discounts = filterDiscountsForInvoiceMode(
-      discountsForEnrollment,
-      paymentMode,
+    const discounts = filterDiscountsForPackage(
+      infoMatricula,
+      filterDiscountsForInvoiceMode(discountsForEnrollment, paymentMode),
+      isSpecializationPackage,
     );
     traceDiscounts('discountsAfterInvoiceModeFilter', discounts);
 
@@ -533,6 +605,8 @@ export class ConsultInvoiceService {
         descuentoExtra,
         quantity,
         categoriaId,
+        applyExternalDiscounts: isSpecializationPackage,
+        externalDiscountConceptIds: SPECIALIZATION_TUITION_CONCEPT_IDS,
       }),
     );
     detailInvoice.forEach(traceDetailDiscount);
