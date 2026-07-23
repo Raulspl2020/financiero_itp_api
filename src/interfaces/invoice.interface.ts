@@ -52,4 +52,6 @@ export interface ICreateDetailInvoice {
   quantity?: number;
   categoriaId?: number;
   total?: number;
+  applyExternalDiscounts?: boolean;
+  externalDiscountConceptIds?: number[];
 }

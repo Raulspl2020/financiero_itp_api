@@ -1,14 +1,16 @@
-import { ICreateDetailInvoice } from 'src/interfaces/invoice.interface';
-import { ECategoryInvoice } from 'src/modules/invoice/enums/invoice.enum';
+import { ICreateDetailInvoice } from '../../interfaces/invoice.interface';
+import { ECategoryInvoice } from '../../modules/invoice/enums/invoice.enum';
 import { DeepPartial } from 'typeorm';
 import { DetailInvoice } from '../../modules/invoice/entities/detailInvoice.entity';
 import { calcularSubTotal } from '../invoice.util';
+
+const RATE_DECIMAL_FACTOR = 1000000;
 
 const clampRate = (value: number): number => {
   if (Number.isNaN(value)) return 0;
   if (value < 0) return 0;
   if (value > 1) return 1;
-  return value;
+  return Math.round(value * RATE_DECIMAL_FACTOR) / RATE_DECIMAL_FACTOR;
 };
 
 export const INDIVIDUAL_CREDIT_CONCEPT_IDS = [33, 35];
@@ -20,6 +22,8 @@ export const createDetailInvoice = ({
   quantity = 1,
   total = 0,
   categoriaId = 0,
+  applyExternalDiscounts = false,
+  externalDiscountConceptIds = [],
 }: ICreateDetailInvoice) => {
   return packageDetail
     .map<DeepPartial<DetailInvoice>>((detail) => {
@@ -33,14 +37,20 @@ export const createDetailInvoice = ({
         }
       }
 
+      const shouldApplyExternalDiscount =
+        detail.descuentoExt == '1' ||
+        (applyExternalDiscounts &&
+          externalDiscountConceptIds.includes(Number(conceptoId)));
+      const shouldApplyExternalIncrease = detail.descuentoExt == '1';
+
       return {
         conceptoId,
         valorUnidad: total > 0 ? total : valorUnidad,
         concept: detail.concept,
-        aumento: detail.descuentoExt == '1' ? aumentoExtra + aumento : aumento,
+        aumento: shouldApplyExternalIncrease ? aumentoExtra + aumento : aumento,
         cantidad: Number(detailQuantity < 1 ? 1 : detailQuantity),
         descuento: clampRate(
-          Number(detail.descuentoExt == '1' ? descuentoExtra + descuento : descuento),
+          Number(shouldApplyExternalDiscount ? descuentoExtra + descuento : descuento),
         ),
       };
     })
